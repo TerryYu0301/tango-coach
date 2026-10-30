@@ -114,6 +114,7 @@ def get_stats(lesson=None, db_path=DB_PATH):
         "words_practiced": len(recent),
         "weak_words": weak_words,
         "mastered_words": mastered_words,
+        "practiced_words": list(recent.keys()),
     }
 
 
