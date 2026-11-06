@@ -1,5 +1,8 @@
 import json
 import time
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from google import genai
@@ -7,21 +10,48 @@ from google.genai import types
 
 load_dotenv()                      # 從 .env 讀取 GEMINI_API_KEY
 
-# 依序嘗試的模型：前一個額度用完（429），就自動換下一個
 # 依序嘗試的模型：遇到 429（額度用完）或 404（不能用）就自動換下一個
 MODELS = [
     "gemini-3.8-flash",
-    "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",       # 上次 404 錯誤訊息裡，Google 建議改用這個
+    "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
 ]
 MAX_LLM_RETRY = 2                  # 同一個模型失敗後最多再試 2 次（之後會搬到 config.py）
 LLM_TIMEOUT_MS = 30_000            # 每次呼叫最多等 30 秒（單位是毫秒）
 
+EXHAUSTED_FILE = Path("data/exhausted_models.json")   # 記錄「今天」額度已經用完的模型
+
 _client = None
-_exhausted_models = set()          # 這次執行中已經確定額度用完的模型，之後直接跳過
+
+
+def _today():
+    """Gemini 的每日額度是照美國太平洋時間的午夜重置，所以用太平洋時間的日期"""
+    return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
+
+
+def _load_exhausted():
+    """讀取今天已經用完額度的模型；日期不是今天就代表額度已經重置，回傳空的"""
+    try:
+        data = json.loads(EXHAUSTED_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return set()
+    if data.get("date") != _today():
+        return set()
+    return set(data.get("models", []))
+
+
+def _mark_exhausted(model):
+    """把用完額度的模型記下來，下次執行也會直接跳過"""
+    _exhausted_models.add(model)
+    EXHAUSTED_FILE.write_text(
+        json.dumps({"date": _today(), "models": sorted(_exhausted_models)}),
+        encoding="utf-8",
+    )
+
+
+_exhausted_models = _load_exhausted()   # 程式一啟動就先讀取
 
 
 def get_client():
@@ -34,12 +64,44 @@ def get_client():
     return _client
 
 
+def generate(contents, config):
+    """
+    依序嘗試 MODELS 裡的模型，回傳 {"ok": True, "response": ..., "model": ...} 或 {"ok": False, "error": ...}
+    - 503（伺服器忙）：同一個模型等一下再試
+    - 504（逾時）：已經等很久了，直接換下一個模型
+    - 429 每日額度用完、404 不能用：今天都不再用這個模型（記在 data/exhausted_models.json）
+    - 429 每分鐘次數超過：先換下一個模型
+    - 其他錯誤（例如參數寫錯）：重試也沒用，直接回報
+    """
+    last_error = ""
+    for model in MODELS:
+        if model in _exhausted_models:
+            continue                              # 已經知道不能用，不浪費次數
+        for attempt in range(1 + MAX_LLM_RETRY):     # 第 1 次 + 重試 2 次 = 每個模型最多 3 次
+            try:
+                response = get_client().models.generate_content(
+                    model=model, contents=contents, config=config,
+                )
+                return {"ok": True, "response": response, "model": model}
+            except Exception as e:
+                last_error = str(e)
+                print(f"[llm] {model} 第 {attempt + 1} 次失敗：{last_error[:80]}")
+                if "404" in last_error or ("429" in last_error and "PerDay" in last_error):
+                    _mark_exhausted(model)
+                    break                         # 這個模型今天不能用了，換下一個（下次執行也會跳過）
+                if "429" in last_error:
+                    break                         # 每分鐘次數超過，先換下一個模型
+                if "504" in last_error or "timed out" in last_error:
+                    break                         # 已經等了 30 秒還沒回應，不要再等，直接換下一個模型
+                if not any(code in last_error for code in ("500", "503")):
+                    return {"ok": False, "error": f"LLM 呼叫失敗（不是暫時性錯誤，不重試）：{last_error}"}
+                time.sleep(2 * (attempt + 1))     # 伺服器忙（503），等一下再試同一個模型
+
+    return {"ok": False, "error": f"所有模型都失敗了，最後的錯誤：{last_error}"}
+
+
 def ask_llm(prompt, want_json=False):
-    """
-    依序嘗試 MODELS 裡的模型，回傳 {"ok": True, "text": ..., "model": ...} 或 {"ok": False, "error": ...}
-    - 503、504（伺服器忙、逾時）：同一個模型等一下再試
-    - 429（額度用完）：直接換下一個模型
-    """
+    """單純問一個問題，回傳 {"ok": True, "text": ..., "model": ...} 或 {"ok": False, "error": ...}"""
     config = types.GenerateContentConfig(temperature=0)    # temperature=0：回答盡量穩定
     if want_json:
         config = types.GenerateContentConfig(
@@ -47,25 +109,10 @@ def ask_llm(prompt, want_json=False):
             response_mime_type="application/json",
         )
 
-    last_error = ""
-    for model in MODELS:
-        if model in _exhausted_models:
-            continue                              # 已經知道額度用完，不浪費次數
-        for attempt in range(1 + MAX_LLM_RETRY):     # 第 1 次 + 重試 2 次 = 每個模型最多 3 次
-            try:
-                response = get_client().models.generate_content(
-                    model=model, contents=prompt, config=config,
-                )
-                return {"ok": True, "text": response.text, "model": model}
-            except Exception as e:
-                last_error = str(e)
-                print(f"[llm] {model} 第 {attempt + 1} 次失敗：{last_error[:80]}")
-                if "429" in last_error or "404" in last_error:
-                    _exhausted_models.add(model)
-                    break                         # 這個模型額度用完，跳出內層迴圈，換下一個模型
-                time.sleep(2 * (attempt + 1))     # 暫時性錯誤，等一下再試同一個模型
-
-    return {"ok": False, "error": f"所有模型都失敗了，最後的錯誤：{last_error}"}
+    r = generate(prompt, config)
+    if not r["ok"]:
+        return r
+    return {"ok": True, "text": r["response"].text, "model": r["model"]}
 
 
 def judge_with_llm(word, user_answer, direction):
