@@ -1,27 +1,15 @@
 import json
 import time
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from src.config import EXHAUSTED_FILE, LLM_TIMEOUT_MS, MAX_LLM_RETRY, MODELS
+
 load_dotenv()                      # 從 .env 讀取 GEMINI_API_KEY
-
-# 依序嘗試的模型：遇到 429（額度用完）或 404（不能用）就自動換下一個
-MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-]
-MAX_LLM_RETRY = 2                  # 同一個模型失敗後最多再試 2 次（之後會搬到 config.py）
-LLM_TIMEOUT_MS = 30_000            # 每次呼叫最多等 30 秒（單位是毫秒）
-
-EXHAUSTED_FILE = Path("data/exhausted_models.json")   # 記錄「今天」額度已經用完的模型
 
 _client = None
 

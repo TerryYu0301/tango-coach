@@ -1,0 +1,8 @@
+# 這些檔案不要複製進容器
+.env
+.venv/
+.git/
+__pycache__/
+*.db
+logs/
+data/exhausted_models.json

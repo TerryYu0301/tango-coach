@@ -2,13 +2,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-# 資料庫檔案的位置
-DB_PATH = Path("data/tango.db")
-
-# 弱點與熟練的判斷標準（之後會搬到 config.py）
-WEAK_WINDOW = 3       # 看每個字最近 3 次作答
-WEAK_THRESHOLD = 2    # 最近 3 次裡錯 2 次以上 → 弱點
-MASTERED_STREAK = 3   # 最近連續答對 3 次 → 熟練
+from src.config import DB_PATH, MASTERED_STREAK, WEAK_THRESHOLD, WEAK_WINDOW
 
 
 def make_word_key(word):
