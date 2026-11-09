@@ -1,3 +1,4 @@
+import readline  # 讓 input() 可以正確刪除中文、日文，也能用方向鍵移動游標
 from src.agent import new_session, run_turn
 
 

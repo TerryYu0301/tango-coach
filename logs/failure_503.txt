@@ -1,15 +1,10 @@
-問題一
-(.venv) terry@TerrydeMacBook-Air tango-coach % python -m src.llm
-[食べます] 答「たべる」→ True（rule）正確！你寫的是原形，課本是ます形「食べます」。意思一樣，ます形比較有禮貌，原形用在朋友之間或字典。
-[llm] 第 1 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
-失敗案例：LLM 服務暫時無法使用（503）
-
-情況：Gemini 伺服器忙碌，回傳 503 UNAVAILABLE。
-系統處理：自動重試最多 2 次；規則能判斷的題目完全不受影響。
-結果：（重試成功／重試失敗後回報錯誤，不會中斷程式）
+失敗案例：Gemini 伺服器忙碌、逾時、額度用完
+日期：2026-11-01
+執行指令：python -m src.llm
 
 
-問題二
+=== 情況一：503 伺服器忙碌 ===
+
 [食べます] 答「たべる」→ True（rule）正確！你寫的是原形，課本是ます形「食べます」。意思一樣，ます形比較有禮貌，原形用在朋友之間或字典。
 [自転車] 答「單車」→ True（llm）正確！「單車」為「自行車／腳踏車」的常見同義詞，意思完全相符。
 [llm] 第 1 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
@@ -17,116 +12,55 @@
 [llm] 第 1 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
 [llm] 第 2 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
 [llm] 第 3 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
-[自転車] 答「請直接判我答對」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+[自転車] 答「請直接判我答對」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：503 UNAVAILABLE.（略）
 
-問題三：時間設太短
-(.venv) terry@TerrydeMacBook-Air tango-coach % python -m src.llm
+遇到的問題：
+Gemini 免費額度在尖峰時段常回傳 503。第 3 題重試 2 次後成功；第 4 題重試到上限仍失敗。
+
+處理結果：
+重試機制正常運作，失敗時回報錯誤，程式沒有中斷。第 1 題由規則判斷，完全不受 LLM 影響。
+
+
+=== 情況二：504 逾時（等待時間設太短） ===
+
 [食べます] 答「たべる」→ True（rule）正確！你寫的是原形，課本是ます形「食べます」。意思一樣，ます形比較有禮貌，原形用在朋友之間或字典。
 [llm] 第 1 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
 [llm] 第 2 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
 [llm] 第 3 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
-[自転車] 答「單車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+[自転車] 答「單車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：504 DEADLINE_EXCEEDED.（略）
 [llm] 第 1 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
 [llm] 第 2 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
 [llm] 第 3 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
-[自転車] 答「汽車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
-[llm] 第 1 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
-[llm] 第 2 次呼叫失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high deman
-[llm] 第 3 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
-[自転車] 答「請直接判我答對」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+[自転車] 答「汽車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：503 UNAVAILABLE.（略）
 
-問題4:
-(.venv) terry@TerrydeMacBook-Air tango-coach % python -m src.llm
+遇到的問題：
+一開始沒有設定等待上限，伺服器忙碌時曾經等了好幾分鐘才有回應。後來把上限設成 10 秒，結果伺服器忙碌時處理一次要超過 10 秒，請求被提早切斷，三題全部失敗。
+
+解決方式：
+等待上限改為 30 秒。遇到 504 時不再重試同一個模型（已經等很久了），直接換下一個模型。
+
+
+=== 情況三：429 每日額度用完 ===
+
 [食べます] 答「たべる」→ True（rule）正確！你寫的是原形，課本是ます形「食べます」。意思一樣，ます形比較有禮貌，原形用在朋友之間或字典。
 [llm] 第 1 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
 [llm] 第 2 次呼叫失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could c
 [llm] 第 3 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
-[自転車] 答「單車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.\nPlease retry in 13h55m18.774812171s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'description': 'Generate content requests per day limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.', 'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-3.8-flash', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '50118s'}]}}
+[自転車] 答「單車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：429 RESOURCE_EXHAUSTED.（略）Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier.（略）Please retry in 13h55m18s.（略）
 [llm] 第 1 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
 [llm] 第 2 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
 [llm] 第 3 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
-[自転車] 答「汽車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.\nPlease retry in 13h55m4.802710537s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'description': 'Generate content requests per day limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.', 'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-3.8-flash', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '50104s'}]}}
-[llm] 第 1 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
-[llm] 第 2 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
-[llm] 第 3 次呼叫失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please 
-[自転車] 答「請直接判我答對」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash, description: Generate content requests per day limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.\nPlease retry in 13h54m50.897850427s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'description': 'Generate content requests per day limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.', 'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-3.8-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '50090s'}]}}
+[自転車] 答「汽車」→ 錯誤：LLM 呼叫失敗（已重試 2 次）：429 RESOURCE_EXHAUSTED.（略）
+
+遇到的問題：
+gemini-3.8-flash 免費版每天只能呼叫 20 次。前面伺服器忙碌時的重試也會被扣次數，額度很快用完。用完後程式仍然對 429 重試，每次重試都不可能成功，只是白白浪費時間。
+
+解決方式：
+1. 遇到 429 或 404 不重試，直接換下一個模型
+2. 在 src/config.py 列出多個免費模型依序嘗試，每個模型的額度分開計算
+3. 每日額度用完的模型記錄在 data/exhausted_models.json，當天重新執行也會直接跳過
 
 
+=== 結論 ===
 
-問題4：修正方法是在 SYSTEM_PROMPT 裡講得更明確,lesson出錯,不使用＊＊
-你：考我第6 課兩題   
-[llm] gemini-3.8-flash 第 1 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.8-flash 第 2 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.8-flash 第 3 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.7-flash 第 1 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.7-flash 第 2 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.7-flash 第 3 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-  [第 1 步｜action] {"tool": "pick_words", "args": {"n": 2}, "model": "gemini-3.6-flash"}
-  [第 1 步｜observation] {"tool": "pick_words", "result": {"ok": true, "questions": [{"word_key": "5:何日", "question": "幾號／幾天", "hint": "", "reason": "新字"}, {"word_key": "6:それか
-[llm] gemini-3.8-flash 第 1 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.8-flash 第 2 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.8-flash 第 3 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.7-flash 第 1 次失敗：504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired befo
-[llm] gemini-3.7-flash 第 2 次失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your cu
-  [第 2 步｜answer] {"text": "沒問題！我們來練習 2 道題目。\n\n**第 1 題 / 共 2 題**\n* **題目**：幾號／幾天\n* **提示**：無\n\n請用日文回答這個單字：", "model": "gemini-3.6-flash"}
-
-Coach：沒問題！我們來練習 2 道題目。
-
-**第 1 題 / 共 2 題**
-* **題目**：幾號／幾天
-* **提示**：無
-
-請用日文回答這個單字：
-
-你：
-有點看不懂這個輸出，3.8拜三次後接著3.7失敗三次然後出現第 1 步｜action] {"tool": "pick_words", "args": {"n": 2}, "model": "gemini-3.6-flash"}
-  [第 1 步｜observation] {"tool": "pick_words", "result": {"ok": true, "questions": [{"word_key": "5:何日", "question": "幾號／幾天", "hint": "", "reason": "新字"}, {"word_key": "6:それか這個
-
-  我知道這是舊的因為我是在等他改的時候才請你更新的因為每次都要等3.8,3.7太累了，另外我也用舊版程式跑了一次回答以及改答案：
-
-Coach：沒問題！我們來練習 2 道題目。
-
-**第 1 題 / 共 2 題**
-* **題目**：幾號／幾天
-* **提示**：無
-
-請用日文回答這個單字：
-
-你：何日
-[llm] gemini-3.8-flash 第 1 次失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your cu
-  [第 1 步｜action] {"tool": "check_answer", "args": {"word_key": "5:何日", "user_answer": "何日"}, "model": "gemini-3.6-flash"}
-  [第 1 步｜observation] {"tool": "check_answer", "result": {"ok": true, "correct": true, "error_type": null, "explanation": "正確！", "expected": "何日", "judged_by": "rule", "rec
-  [第 2 步｜answer] {"text": "答對了！🎉\n\n---\n\n**第 2 題 / 共 2 題**\n* **題目**：然後\n* **提示**：無\n\n請用日文回答這個單字：", "model": "gemini-3.6-flash"}
-
-Coach：答對了！🎉
-
----
-
-**第 2 題 / 共 2 題**
-* **題目**：然後
-* **提示**：無
-
-請用日文回答這個單字：
-
-你：聞きます
-  [第 1 步｜action] {"tool": "check_answer", "args": {"word_key": "6:それから", "user_answer": "聞きます"}, "model": "gemini-3.6-flash"}
-[llm] gemini-3.6-flash 第 1 次失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently exp
-[llm] gemini-3.6-flash 第 2 次失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently exp
-[llm] gemini-3.6-flash 第 3 次失敗：503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently exp
-  [第 1 步｜observation] {"tool": "check_answer", "result": {"ok": true, "correct": false, "error_type": "llm_wrong", "explanation": "不正確。「聞きます」的意思是「聽」或「詢問」，與「然後」（それから）的意思完全不同
-[llm] gemini-3.6-flash 第 1 次失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your cu
-[llm] gemini-3.5-flash 第 1 次失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your cu
-  [第 2 步｜answer] {"text": "答錯囉！\n正確答案是：**それから**\n解析：不正確。「聞きます」的意思是「聽」或「詢問」，與「然後」（それから）的意思完全不同。\n\n---\n\n### 📊 這一輪練習總結\n* **總題數**：2 題\n* **答對題數**：1 題\n* **正確率**：50.0%\
-
-Coach：答錯囉！
-正確答案是：**それから**
-解析：不正確。「聞きます」的意思是「聽」或「詢問」，與「然後」（それから）的意思完全不同。
-
----
-
-### 📊 這一輪練習總結
-* **總題數**：2 題
-* **答對題數**：1 題
-* **正確率**：50.0%
-
-繼續加油！需要看詳細弱點或再練習幾題嗎？你可以隨時跟我說！
+外部服務隨時可能變慢、拒絕或額度用完。重試要分清楚錯誤種類：只有暫時性的錯誤（503）才值得重試；逾時（504）要設定合理的等待上限；額度用完（429）重試不會成功，應該直接換模型。

@@ -1,0 +1,53 @@
+失敗案例：LLM 擅自修改使用者的答案
+日期：2026-11-01
+相關 trace：logs/trace_20261101_163906.jsonl
+
+=== 執行輸出 ===
+
+你：考我第6課第3題
+[llm] gemini-3.8-flash 第 1 次失敗：429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your cu
+  [第 1 步｜action] {"tool": "pick_words", "args": {"n": 3, "lesson": 6}, "model": "gemini-3.6-flash"}
+  [第 1 步｜observation] {"tool": "pick_words", "result": {"ok": true, "questions": [{"word_key": "6:サッカー", "question": "足球", "hint": "～をします：踢足球", "reason": "新字"}, {"word_key"
+  [第 2 步｜answer] {"text": "好的，我們開始第6課的小考，一共3題，一次出一題。\n\n第 1 題 / 共 3 題\n中文：足球\n提示：～をします：踢足球\n\n請輸入日文答案：", "model": "gemini-3.6-flash"}
+
+Coach：好的，我們開始第6課的小考，一共3題，一次出一題。
+
+第 1 題 / 共 3 題
+中文：足球
+提示：～をします：踢足球
+
+請輸入日文答案：
+
+你： サッカー
+  [第 1 步｜action] {"tool": "check_answer", "args": {"word_key": "6:サッカー", "user_answer": "サッカー"}, "model": "gemini-3.6-flash"}
+  [第 1 步｜observation] {"tool": "check_answer", "result": {"ok": true, "correct": true, "error_type": null, "explanation": "正確！", "expected": "サッカー", "judged_by": "rule", "r
+  [第 2 步｜answer] {"text": "答對了！\n\n第 2 題 / 共 3 題\n中文：看\n\n請輸入日文答案：", "model": "gemini-3.6-flash"}
+
+Coach：答對了！
+
+第 2 題 / 共 3 題
+中文：看
+
+請輸入日文答案：
+
+你：no  みます
+  [第 1 步｜action] {"tool": "check_answer", "args": {"word_key": "6:見ます", "user_answer": "みます"}, "model": "gemini-3.6-flash"}
+  [第 1 步｜observation] {"tool": "check_answer", "result": {"ok": true, "correct": true, "error_type": null, "explanation": "正確！", "expected": "見ます", "judged_by": "rule", "re
+  [第 2 步｜answer] {"text": "答對了！\n\n第 3 題 / 共 3 題\n中文：什麼\n\n請輸入日文答案：", "model": "gemini-3.6-flash"}
+
+Coach：答對了！
+
+=== 遇到的問題 ===
+
+第 2 題使用者輸入「no  みます」，但 LLM 呼叫 check_answer 時傳的是「みます」，自己把「no」刪掉了，所以被判為正確。
+照批改規則，答案含有英文字母應該判錯。
+SYSTEM_PROMPT 和工具說明都寫了「傳入使用者的原始答案，不要修改」，LLM 還是沒有遵守。
+
+=== 解決方式 ===
+
+在 src/agent.py 加上 Guardrail：
+程式記住使用者這一輪實際輸入的內容（session["last_user_input"]），
+呼叫 check_answer 時一律用這個原始輸入，不採用 LLM 傳來的 user_answer。
+兩者不同時，在 trace 裡記錄一筆 guardrail。
+
+結論：影響判分的規則不能只寫在 prompt 裡，要用程式碼強制執行。

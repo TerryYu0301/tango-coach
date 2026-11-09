@@ -1,0 +1,33 @@
+失敗案例：LLM 沒有照 SYSTEM_PROMPT 的規則走
+日期：2026-11-01
+執行指令：python -m src.main
+
+=== 執行輸出 ===
+
+你：考我第6 課兩題
+  [第 1 步｜action] {"tool": "pick_words", "args": {"n": 2}, "model": "gemini-3.6-flash"}
+  [第 1 步｜observation] {"tool": "pick_words", "result": {"ok": true, "questions": [{"word_key": "5:何日", "question": "幾號／幾天", "hint": "", "reason": "新字"}, {"word_key": "6:それか
+  [第 2 步｜answer] {"text": "沒問題！我們來練習 2 道題目。\n\n**第 1 題 / 共 2 題**\n* **題目**：幾號／幾天\n* **提示**：無\n\n請用日文回答這個單字：", "model": "gemini-3.6-flash"}
+
+Coach：沒問題！我們來練習 2 道題目。
+
+**第 1 題 / 共 2 題**
+* **題目**：幾號／幾天
+* **提示**：無
+
+請用日文回答這個單字：
+
+=== 遇到的問題 ===
+
+1. 使用者說「考我第 6 課」，但 LLM 呼叫 pick_words 時沒有傳 lesson 參數，所以出的第一題「何日」是第 5 課的字。
+2. LLM 回覆時使用了 ** 和 * 這類 Markdown 符號，還有表情符號。終端機不會把它們顯示成粗體，而是直接印出符號，畫面很亂。
+
+=== 解決方式 ===
+
+在 SYSTEM_PROMPT 加上兩條規則：
+1. 如果使用者有指定第幾課，一定要傳入 lesson 參數
+2. 回覆會顯示在終端機，不要使用 Markdown 符號和表情符號
+
+修正後重新測試，LLM 有正確傳入 lesson: 6，回覆也沒有再出現 Markdown 符號。
+
+這類問題只能靠 prompt 改善，無法保證 LLM 每次都遵守；會影響判分正確性的規則，則改用程式碼強制執行（見失敗案例一）。
